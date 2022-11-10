@@ -194,6 +194,8 @@
                         return;
                     }
                     $("#logModal").show();
+                    $("#logContent").get(0).scrollTop = 0
+
                     $("body").addClass("ReactModal__Body--open");
                     setLogs(allLogs);
 
