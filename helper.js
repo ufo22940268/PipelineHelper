@@ -5,15 +5,16 @@
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
-// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
 // @grant       GM_xmlhttpRequest
 // @connect     compass.com
 // ==/UserScript==
 
 let pipeline;
+let showLogButton;
+let firstLoadTime;
 
 function getLog(stageName, podId, cb) {
-    const logRange = 3600*48
+    const logRange = 3600*1
     const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
     const container = stage.lastDeploy.deployment.spec.template.spec.containers[0].name;
     const url = `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}/logs?podId=${podId}&container=${container}&sinceSeconds=${logRange}`
@@ -33,18 +34,24 @@ function getLog(stageName, podId, cb) {
                     } catch (e) {
                     }
                 }).filter(t => !!t).map(o => {
-                    o.time = moment(o.time, "YYYYMMDD hh:mm:ss.SSS");
+                    let t = moment(o.time, "YYYYMMDD hh:mm:ss.SSS")
+                    if (!t.isValid()) {
+                        t = moment(o.time);
+                    }
+                    o.time = t;
+                    o.level = o.level || o.status;
                     return o;
                 });
                 cb(null, jsons)
             } catch(e) {
-                console.log('getLog error:', data)
+                console.log('getLog error:', data, e)
+                cb(e, null)
             }
         }
     })
 }
 
-function getLogs(stageName, podIds, onload) {
+function getLogs(stageName, podIds, instantLogs, onload) {
     async.map(podIds, getLog.bind(null, stageName), (err, r) => {
         onload(null, [].concat(...r).sort((l, r) => r.time - l.time))
     })
@@ -82,6 +89,7 @@ function addDialog() {
 
 function setLogs(allLogs) {
     const modal = $("#logContent");
+    modal.empty();
     for (let log of allLogs) {
         const lineElem = $('<div class="logModalLine"></div>')
         const line = `${log.time.format()} ${log.level} ${log.message} `
@@ -92,12 +100,18 @@ function setLogs(allLogs) {
 }
 
 function setLoading(isLoading) {
-    $("#viewLog").prop('disabled', isLoading)
+    showLogButton.prop('disabled', isLoading)
+    if (isLoading) {
+        showLogButton.text('View Logs ...')
+    } else {
+        showLogButton.text('View Logs')
+    }
 }
 
 function showLogDialog(stageName) {
     setLoading(true);
     const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
+    firstLoadTime = new Date();
     GM_xmlhttpRequest({
         url: `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}`,
         method: "GET",
@@ -108,13 +122,18 @@ function showLogDialog(stageName) {
         onload: function (data) {
             if (!data.response.items) {
                 console.log("response error:", data.response)
+                setLoading(showLogBtn, false);
             }
+
             const podIds = data.response.items.map(t => t.metadata.name)
-            getLogs(stageName, podIds, (err, allLogs) => {
-                console.log("logs", allLogs)
+            getLogs(stageName, podIds, false, (err, allLogs) => {
+                setLoading(false);
+                if (err) {
+                    console.log("err:", err);
+                    return;
+                }
                 $("#logModal").show();
                 setLogs(allLogs);
-                setLoading(false);
             })
         }
     })
@@ -140,9 +159,11 @@ function addLogButtons(node) {
     viewLogBtn.on("click", (elem) => {
         const text = $(elem.target).parent().parent().parent().parent().parent().find("h5:contains('Stage')").text();
         const stage = text.split(' ')[0]
+        showLogButton = $(elem.target)
         showLogDialog(stage);
     });
 }
+
 
 let styleAdded;
 function addStyles() {
@@ -169,7 +190,7 @@ function addStyles() {
 }
 
 
-function loadPipeline() {
+function loadPipeline(onload) {
     const segs = window.location.pathname.split('/')
     if (segs.length !== 5 ||segs[1] !== 'teams' || segs[3] !== 'apps' ) {
         return;
@@ -190,6 +211,7 @@ function loadPipeline() {
             }
 
             pipeline = data.response;
+            onload()
         }
     })
 }
@@ -197,10 +219,23 @@ function loadPipeline() {
 (function () {
     'use strict';
     pipeline = null;
-    loadPipeline();
+    console.log(unsafeWindow)
+    if (window.onurlchange === null) {
+        // feature is supported
+        window.addEventListener('urlchange', (info) => {
+            console.log('url changed------------');
+            waitForKeyElements("button:contains('View Pod Details')", (node) => {
+                loadPipeline(() => {
+                    addLogButtons(node);
+                })
+            }, true)
+        });
+    }
     waitForKeyElements("button:contains('View Pod Details')", (node) => {
         addStyles();
-        addLogButtons(node);
+        loadPipeline(() => {
+            addLogButtons(node);
+        })
     }, true)
 
     addDialog();
