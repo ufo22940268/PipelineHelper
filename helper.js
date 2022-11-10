@@ -1,14 +1,22 @@
 // ==UserScript==
 // @name         Pipeline Helper
-// @namespace    http://compass.com/
+// @namespace    http://tampermonkey.net/
 // @version      0.1
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
+// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
 // @grant       GM_xmlhttpRequest
+// @grant       GM_addStyle
+// @grant window.onurlchange
 // @connect     compass.com
+// @require     http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
+// @require  https://cdnjs.cloudflare.com/ajax/libs/async/3.2.4/async.min.js
+// @require https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js
+// @require https://gist.githubusercontent.com/raw/2625891/waitForKeyElements.js
 // ==/UserScript==
 
+/* globals jQuery, $, waitForKeyElements */
 
 (function () {
     let pipeline;
