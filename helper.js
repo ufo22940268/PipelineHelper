@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
@@ -56,7 +56,12 @@
     function getLog(stageName, logRange, podId, cb) {
         const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
         const container = stage.lastDeploy.deployment.spec.template.spec.containers[0].name;
-        const url = `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}/logs?podId=${podId}&container=${container}&sinceSeconds=${logRange}`
+        let url = `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}/logs?podId=${podId}&container=${container}`
+        if (logRange != -1) {
+            url += `&sinceSeconds=${logRange}`;
+        } else {
+            url += `&previous=false`;
+        }
         GM_xmlhttpRequest({
             url,
             method: "GET",
@@ -95,7 +100,7 @@
         if (instantLogs) {
             logRange = Math.floor((new Date().getTime() - firstLoadTime.getTime()) / 1000)
         } else {
-            logRange = 3600 * 7
+            logRange = -1
         }
         async.map(podIds, getLog.bind(null, stageName, logRange), (err, r) => {
             onload(null, [].concat(...r).sort((l, r) => r.time - l.time))
