@@ -10,9 +10,13 @@
 // @connect     compass.com
 // ==/UserScript==
 
+let pipeline;
 
-function getLog(podId, cb) {
-    const url = `https://pipelines.compass.com/api/v1/teams/marketing-automation/applications/marketing-plans/clusters/gamma/gamma-backend-20211015/deployments/default/marketingautomation-marketingplans-deployment/logs?podId=${podId}&container=marketingautomation-marketingplans&previous=false`
+function getLog(stageName, podId, cb) {
+    const logRange = 3600*48
+    const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
+    const container = stage.lastDeploy.deployment.spec.template.spec.containers[0].name;
+    const url = `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}/logs?podId=${podId}&container=${container}&sinceSeconds=${logRange}`
     GM_xmlhttpRequest({
         url,
         method: "GET",
@@ -21,24 +25,27 @@ function getLog(podId, cb) {
             "authorization": `Bearer ${token()}`
         },
         onload: function (data) {
-            const lines = data.response.split('\n')
-            const jsons = lines.map(l => {
-                try {
-                    return JSON.parse(l);
-                } catch (e) {
-                }
-            }).filter(t => !!t).map(o => {
-                o.time = moment(o.time, "YYYYMMDD hh:mm:ss.SSS");
-                return o;
-            });
-            cb(null, jsons)
+            try {
+                const lines = data.response.split('\n')
+                const jsons = lines.map(l => {
+                    try {
+                        return JSON.parse(l);
+                    } catch (e) {
+                    }
+                }).filter(t => !!t).map(o => {
+                    o.time = moment(o.time, "YYYYMMDD hh:mm:ss.SSS");
+                    return o;
+                });
+                cb(null, jsons)
+            } catch(e) {
+                console.log('getLog error:', data)
+            }
         }
     })
 }
 
-function getLogs(podIds, onload) {
-    const r = {};
-    async.map(podIds, getLog, (err, r) => {
+function getLogs(stageName, podIds, onload) {
+    async.map(podIds, getLog.bind(null, stageName), (err, r) => {
         onload(null, [].concat(...r).sort((l, r) => r.time - l.time))
     })
 }
@@ -59,12 +66,10 @@ function addDialog() {
   bottom: 100px;
   padding: 88px;
   ">
-  <button id="closeLogModal" style="position: absolute; left: 20px; top: 20px; background: transparent; padding: 16px; color: black">
+  <button id="closeLogModal" style="position: absolute; right: 20px; top: 20px; background: transparent; padding: 16px; color: black">
      X 
 </button>
 <div id="logContent" style="overflow: auto; width: 100%; height: 100%">
-wefojwiofejwojfowijfowjfeojiwef
-weojwfeoij
 </div>
 </div>
 `);
@@ -76,12 +81,25 @@ weojwfeoij
 
 
 function setLogs(allLogs) {
-    $("#logModal");
+    const modal = $("#logContent");
+    for (let log of allLogs) {
+        const lineElem = $('<div class="logModalLine"></div>')
+        const line = `${log.time.format()} ${log.level} ${log.message} `
+        lineElem.text(line);
+        lineElem.addClass(log.level || log.status)
+        modal.append(lineElem)
+    }
 }
 
-function showLogDialog() {
+function setLoading(isLoading) {
+    $("#viewLog").prop('disabled', isLoading)
+}
+
+function showLogDialog(stageName) {
+    setLoading(true);
+    const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
     GM_xmlhttpRequest({
-        url: "https://pipelines.compass.com/api/v1/teams/marketing-automation/applications/marketing-plans/clusters/gamma/gamma-backend-20211015/deployments/default/marketingautomation-marketingplans-deployment",
+        url: `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}`,
         method: "GET",
         responseType: "json",
         headers: {
@@ -92,10 +110,11 @@ function showLogDialog() {
                 console.log("response error:", data.response)
             }
             const podIds = data.response.items.map(t => t.metadata.name)
-            getLogs(podIds, (err, allLogs) => {
+            getLogs(stageName, podIds, (err, allLogs) => {
                 console.log("logs", allLogs)
                 $("#logModal").show();
                 setLogs(allLogs);
+                setLoading(false);
             })
         }
     })
@@ -116,16 +135,71 @@ function addLogButtons(node) {
         "    border-radius: 5px;\n" +
         "    font-weight: 700;\n" +
         "    margin: 10px;"
-    btn.append(`<button id="viewLog" style="${style}">View Logs</button>`)
-    $("#viewLog").on("click", () => {
-        showLogDialog();
+    const viewLogBtn = $(`<button id="viewLog" style="${style}">View Logs</button>`)
+    btn.append(viewLogBtn)
+    viewLogBtn.on("click", (elem) => {
+        const text = $(elem.target).parent().parent().parent().parent().parent().find("h5:contains('Stage')").text();
+        const stage = text.split(' ')[0]
+        showLogDialog(stage);
     });
+}
+
+let styleAdded;
+function addStyles() {
+    if (styleAdded) return;
+    GM_addStyle(`
+        #logContent {
+            padding: 16px; 
+            border: black 2px solid;
+            line-height: 140%;
+        }
+        
+        #logContent .warn {
+            color: rgb(249, 156, 34);
+        }
+        #logContent .info {
+            color: rgb(32, 190, 74);
+        }
+        
+        #logContent .error {
+            color: rgb(241, 57, 44)
+        }
+    `)
+    styleAdded = true;
+}
+
+
+function loadPipeline() {
+    const segs = window.location.pathname.split('/')
+    if (segs.length !== 5 ||segs[1] !== 'teams' || segs[3] !== 'apps' ) {
+        return;
+    }
+
+    const team = segs[2]
+    const app = segs[4];
+    GM_xmlhttpRequest({
+        url: `https://pipelines.compass.com/api/v1/pipelines/${team}/${app}?refresh=true`,
+        method: "GET",
+        responseType: "json",
+        headers: {
+            "authorization": `Bearer ${token()}`
+        },
+        onload: function (data) {
+            if (!data.response) {
+                console.log("response error:", data.response)
+            }
+
+            pipeline = data.response;
+        }
+    })
 }
 
 (function () {
     'use strict';
-
+    pipeline = null;
+    loadPipeline();
     waitForKeyElements("button:contains('View Pod Details')", (node) => {
+        addStyles();
         addLogButtons(node);
     }, true)
 
@@ -134,6 +208,4 @@ function addLogButtons(node) {
     if (!token()) {
         return;
     }
-
-    // showLogDialog();
 })();
