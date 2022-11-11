@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
@@ -78,9 +78,9 @@
                         } catch (e) {
                         }
                     }).filter(t => !!t).map(o => {
-                        let t = moment(o.time, "YYYYMMDD hh:mm:ss.SSS")
+                        let t = moment.utc(o.time, "YYYYMMDD hh:mm:ss.SSS").local()
                         if (!t.isValid()) {
-                            t = moment(o.time);
+                            t = moment.utc(o.time).local();
                         }
                         o.time = t;
                         o.level = o.level || o.status;
