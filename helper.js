@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
@@ -53,10 +53,27 @@
         return;
     }
 
+    function parseStage(stage) {
+        let container;
+        let deployName;
+        let type;
+        if (pipeline.cronJobFile) {
+            deployName = stage.lastDeploy.cronJob.metadata.name;
+            container = stage.lastDeploy.cronJob.spec.jobTemplate.spec.template.spec.containers[0].name;
+            type = "cronjob";
+        } else {
+            deployName = stage.lastDeploy.deployment.metadata.name;
+            container = stage.lastDeploy.deployment.spec.template.spec.containers[0].name;
+            type = "deployments";
+        }
+        return {deployName, container, type}
+    }
+
     function getLog(stageName, logRange, podId, cb) {
         const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
-        const container = stage.lastDeploy.deployment.spec.template.spec.containers[0].name;
-        let url = `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}/logs?podId=${podId}&container=${container}`
+
+        const {container, deployName, type} = parseStage(stage);
+        let url = `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/${type}/default/${deployName}/logs?podId=${podId}&container=${container}`
         if (logRange != -1) {
             url += `&sinceSeconds=${logRange}`;
         } else {
@@ -173,8 +190,9 @@
         setLoading(true);
         const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
         firstLoadTime = new Date();
+        const {deployName, type} = parseStage(stage);
         GM_xmlhttpRequest({
-            url: `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/deployments/default/${stage.lastDeploy.deployment.metadata.name}`,
+            url: `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/${type}/default/${deployName}`,
             method: "GET",
             responseType: "json",
             headers: {
