@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.5
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
@@ -258,9 +258,10 @@
         const viewLogBtn = $(`<button id="viewLog" style="${style}">View Logs</button>`)
         btn.append(viewLogBtn)
         viewLogBtn.on("click", (elem) => {
-            const text = $(elem.target).parent().parent().parent().parent().parent().find("h5:contains('Stage')").text();
+            const text = $(elem.target).parent().parent().parent().parent().find("h5:contains('Stage')").text();
             const stage = text.split(' ')[0]
             showLogButton = $(elem.target)
+            console.log("stage---------------", text);
             showLogDialog(stage);
         });
     }
