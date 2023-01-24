@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
@@ -106,7 +106,7 @@
                     cb(null, jsons)
                 } catch (e) {
                     console.log('getLog error:', data, e)
-                    cb(e, null)
+                    cb(null, [])
                 }
             }
         })
