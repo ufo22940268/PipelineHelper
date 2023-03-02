@@ -24,6 +24,7 @@
     let firstLoadTime;
     let updateLogTask;
     let styleAdded;
+    let autoRefresh = false;
 
     pipeline = null;
 
@@ -142,6 +143,9 @@
   
   <div id="logModalContainer">
   
+    <div id="logModalMenubar">
+         <input id="autoRefresh" type="checkbox" checked="false">Auto Refresh
+    </div>
     <button id="closeLogModal" style="position: absolute; right: 20px; top: 20px; background: transparent; padding: 16px; color: black">
          X 
     </button>
@@ -156,6 +160,11 @@
         $("#closeLogModal").on('click', () => {
             dismissModal();
         })
+
+        $("#logModalMenubar > #autoRefresh").on('click', (ev) => {
+            console.log(ev.target.checked);
+            autoRefresh = ev.target.checked;
+        });
     }
 
 
@@ -168,6 +177,7 @@
         }
 
         modal.empty();
+        allLogs.sort((l, r) => r.time - l.time);
         for (let log of allLogs) {
             const lineElem = $('<div class="logModalLine"></div>')
             const line = `${log.time.format()} ${log.level} ${log.message} `
@@ -227,6 +237,7 @@
         if (updateLogTask) clearInterval(updateLogTask)
 
         updateLogTask = setInterval(() => {
+            if (!autoRefresh) return;
             getLogs(stageName, podIds, true, (err, logs) => {
                 console.log("new logs = " + JSON.stringify(logs, null, 2));
                 if (!logs) return;
@@ -271,7 +282,6 @@
         if (styleAdded) return;
         GM_addStyle(`
         #logContent {
-            padding: 16px; 
             border: black 2px solid;
             line-height: 140%;
         }
@@ -310,12 +320,12 @@
         
         #logModalContainer {
           background: white;
-          padding: 88px;
+          padding: 48px;
           position: absolute;
-          left: 100px;
-          top: 100px;
-          bottom: 100px;
-          right: 100px;
+          left: 20px;
+          top: 30px;
+          bottom: 20px;
+          right: 20px;
           z-index: 100;
         }
     `)
