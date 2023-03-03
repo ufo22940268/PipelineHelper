@@ -178,13 +178,16 @@
 
         modal.empty();
         allLogs.sort((l, r) => r.time - l.time);
+        const lineContainer = $('<div/>');
         for (let log of allLogs) {
             const lineElem = $('<div class="logModalLine"></div>')
             const line = `${log.time.format()} ${log.level} ${log.message} `
             lineElem.text(line);
             lineElem.addClass(log.level || log.status)
-            modal.append(lineElem)
+            lineContainer.append(lineElem);
         }
+
+        modal.append(lineContainer);
     }
 
     function setLoading(isLoading) {
@@ -272,7 +275,6 @@
             const text = $(elem.target).parent().parent().parent().parent().find("h5:contains('Stage')").text();
             const stage = text.split(' ')[0]
             showLogButton = $(elem.target)
-            console.log("stage---------------", text);
             showLogDialog(stage);
         });
     }
