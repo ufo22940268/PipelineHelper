@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.7
+// @version      0.8
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
