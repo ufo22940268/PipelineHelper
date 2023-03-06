@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pipeline Helper
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      0.9
 // @description  Enhance the capability of pipeline
 // @author       You
 // @match        https://pipelines.compass.com/*
@@ -136,8 +136,29 @@
         clearInterval(updateLogTask);
     }
 
+    function handleDownloadLogs() {
+        let log = ''
+         $('#logContent .logModalLine').each(function () {
+            log += $(this).text() + '\n';
+        })
+        download(pipeline.application + moment().format() + ".log", log)
+    }
+
+    function download(filename, text) {
+        var element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        element.setAttribute('download', filename);
+
+        element.style.display = 'none';
+        document.body.appendChild(element);
+
+        element.click();
+
+        document.body.removeChild(element);
+    }
+
     function addDialog() {
-        $("body").append(`
+        const logModal = $(`
 <div id="logModal" class="modal">
   <div id="logModalBackground"></div>
   
@@ -145,6 +166,19 @@
   
     <div id="logModalMenubar">
          <input id="autoRefresh" type="checkbox" checked="false">Auto Refresh
+         <button type="button" id="downloadLogs" style="-webkit-box-pack: center;
+    justify-content: center;
+    padding: 5px 8px;
+    width: fit-content;
+    height: fit-content;
+    font-style: normal;
+    font-size: 12px;
+    background: rgb(255, 255, 255);
+    color: rgb(0, 73, 168);
+    border: 1px solid rgb(0, 73, 168);
+    border-radius: 5px;
+    font-weight: 700;
+    margin: 10px;">Download logs</button>
     </div>
     <button id="closeLogModal" style="position: absolute; right: 20px; top: 20px; background: transparent; padding: 16px; color: black">
          X 
@@ -155,15 +189,21 @@
     </div>
   </div>
 </div>
-`);
+        `)
+        $("body").append(logModal);
+        logModal.hide();
 
         $("#closeLogModal").on('click', () => {
             dismissModal();
         })
 
         $("#logModalMenubar > #autoRefresh").on('click', (ev) => {
-            console.log(ev.target.checked);
             autoRefresh = ev.target.checked;
+        });
+
+        $("#logModalMenubar > #downloadLogs").on('click', (ev) => {
+            console.log('download logs')
+            handleDownloadLogs();
         });
     }
 
