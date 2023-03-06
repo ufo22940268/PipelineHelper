@@ -167,7 +167,7 @@
   <div id="logModalContainer">
   
     <div id="logModalMenubar">
-         <input id="autoRefresh" type="checkbox" checked="false">Auto Refresh
+         <input id="autoRefresh" type="checkbox" ${autoRefresh ? "checked" : "" }>Auto Refresh
          <button type="button" id="downloadLogs" style="-webkit-box-pack: center;
     justify-content: center;
     padding: 5px 8px;
