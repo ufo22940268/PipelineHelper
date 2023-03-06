@@ -23,6 +23,7 @@
     let showLogButton;
     let firstLoadTime;
     let updateLogTask;
+    let activatedStage;
     let styleAdded;
     let autoRefresh = false;
 
@@ -45,7 +46,7 @@
     }, true)
 
     document.addEventListener('keyup', (event) => {
-        if (event.code === 'Escape') dismissModal()
+        if (event.code === 'Escape') closeDialog()
     }, false);
 
     addDialog();
@@ -130,10 +131,11 @@
         return session && session.token;
     }
 
-    function dismissModal() {
+    function closeDialog() {
         $("#logModal").hide();
         $("body").removeClass("ReactModal__Body--open");
         clearInterval(updateLogTask);
+        activatedStage = "";
     }
 
     function handleDownloadLogs() {
@@ -141,7 +143,7 @@
          $('#logContent .logModalLine').each(function () {
             log += $(this).text() + '\n';
         })
-        download(pipeline.application + moment().format() + ".log", log)
+        download(pipeline.application + "_" +  activatedStage + "_" + moment().format() + ".log", log)
     }
 
     function download(filename, text) {
@@ -194,7 +196,7 @@
         logModal.hide();
 
         $("#closeLogModal").on('click', () => {
-            dismissModal();
+            closeDialog();
         })
 
         $("#logModalMenubar > #autoRefresh").on('click', (ev) => {
@@ -243,6 +245,7 @@
         setLoading(true);
         const stage = pipeline.stages.find(s => s['clusterStage'] === stageName);
         firstLoadTime = new Date();
+        activatedStage = stageName;
         const {deployName, type} = parseStage(stage);
         GM_xmlhttpRequest({
             url: `https://pipelines.compass.com/api/v1/teams/${pipeline.team}/applications/${pipeline.application}/clusters/${stageName}/${stage.clusterName}/${type}/default/${deployName}`,
